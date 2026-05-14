@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Font → PNG / SVG</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e0f;
+    --surface: #161618;
+    --border: #2a2a2d;
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #6b6b70;
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px 80px;
+    gap: 36px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.6;
+  }
+
+  header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: 6px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+  }
+
+  .subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 740px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+
+  .field-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .field-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(232, 255, 71, 0.04);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon { font-size: 28px; }
+  .upload-main { font-size: 13px; color: var(--text); }
+  .upload-sub { font-size: 11px; color: var(--muted); }
+
+  .font-loaded {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(232, 255, 71, 0.08);
+    border: 1px solid rgba(232, 255, 71, 0.25);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--accent);
+    margin-top: 10px;
+  }
+
+  .font-loaded.visible { display: flex; }
+  .font-loaded .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  textarea {
+    width: 100%;
+    background: #111113;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 14px 16px;
+    resize: vertical;
+    min-height: 90px;
+    line-height: 1.6;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .control-group label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  .range-val { font-size: 13px; color: var(--accent); font-weight: 500; }
+
+  input[type="color"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #111113;
+    cursor: pointer;
+    padding: 3px;
+  }
+
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 6px; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+  select {
+    width: 100%;
+    height: 40px;
+    background: #111113;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 0 12px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select:focus { border-color: var(--accent); }
+
+  /* Color mode toggle */
+  .color-mode-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .toggle-btn {
+    flex: 1;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #111113;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(232,255,71,0.08);
+  }
+
+  /* Gradient section */
+  .gradient-controls {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .gradient-controls.visible { display: flex; }
+
+  .grad-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    align-items: end;
+  }
+
+  .dir-group { display: flex; gap: 6px; }
+
+  .dir-btn {
+    flex: 1;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #111113;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dir-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(232,255,71,0.08);
+  }
+
+  .grad-bar {
+    height: 10px;
+    border-radius: 5px;
+    transition: background 0.3s;
+  }
+
+  /* Preview */
+  .preview-wrap {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background-image:
+      linear-gradient(45deg, #1c1c1e 25%, transparent 25%),
+      linear-gradient(-45deg, #1c1c1e 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1c1c1e 75%),
+      linear-gradient(-45deg, transparent 75%, #1c1c1e 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  }
+
+  #preview-canvas {
+    max-width: 100%;
+    max-height: 300px;
+    display: block;
+  }
+
+  .preview-placeholder {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .preview-placeholder span:first-child { font-size: 28px; }
+
+  /* Actions */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn {
+    height: 48px;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+    font-weight: 500;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .btn-ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+
+  .btn-png {
+    background: linear-gradient(135deg, var(--accent), #b8cc00);
+    color: #0e0e0f;
+  }
+
+  .btn-svg {
+    background: linear-gradient(135deg, var(--accent2), #cc3300);
+    color: #fff;
+  }
+
+  .btn-png:hover:not(:disabled), .btn-svg:hover:not(:disabled) { opacity: 0.88; }
+
+  .status {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 16px;
+    letter-spacing: 1px;
+  }
+
+  .status.ok  { color: var(--accent); }
+  .status.err { color: var(--accent2); }
+
+  /* Stroke section */
+  .stroke-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .stroke-toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* pill switch */
+  .switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .switch input { opacity: 0; width: 0; height: 0; }
+
+  .switch-track {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .switch-track::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    left: 3px;
+    top: 3px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+
+  .switch input:checked + .switch-track { background: rgba(232,255,71,0.25); }
+  .switch input:checked + .switch-track::after { transform: translateX(18px); background: var(--accent); }
+
+  .stroke-body {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .stroke-body.visible { display: grid; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FONT → PNG / SVG</div>
+  <div class="subtitle">Text to transparent image converter</div>
+</header>
+
+<div class="card">
+
+  <!-- 01 FONT -->
+  <div>
+    <div class="field-label">01 — Font</div>
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="font-file" accept=".ttf,.otf,.woff,.woff2">
+      <div class="upload-icon">🔡</div>
+      <div class="upload-main">Drag or click to load your font</div>
+      <div class="upload-sub">.ttf · .otf · .woff · .woff2</div>
+    </div>
+    <div class="font-loaded" id="font-status">
+      <div class="dot"></div>
+      <span id="font-name">—</span>
+    </div>
+  </div>
+
+  <!-- 02 TEXT -->
+  <div>
+    <div class="field-label">02 — Text</div>
+    <textarea id="text-input" placeholder="Type a letter, a word, or a phrase..."></textarea>
+  </div>
+
+  <!-- 03 TYPOGRAPHY -->
+  <div>
+    <div class="field-label">03 — Typography</div>
+    <div class="controls">
+      <div class="control-group">
+        <label>Size — <span class="range-val" id="size-val">120</span>px</label>
+        <input type="range" id="font-size" min="12" max="600" value="120" step="2">
+      </div>
+      <div class="control-group">
+        <label>Padding — <span class="range-val" id="pad-val">20</span>px</label>
+        <input type="range" id="padding" min="0" max="120" value="20" step="2">
+      </div>
+      <div class="control-group">
+        <label>Line height — <span class="range-val" id="lh-val">1.2</span></label>
+        <input type="range" id="line-height" min="0.8" max="3" value="1.2" step="0.05">
+      </div>
+      <div class="control-group">
+        <label>Alignment</label>
+        <select id="text-align">
+          <option value="center">Center</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>PNG Scale</label>
+        <select id="scale">
+          <option value="1">1x</option>
+          <option value="2" selected>2x (recommended)</option>
+          <option value="3">3x</option>
+          <option value="4">4x</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 COLOR -->
+  <div>
+    <div class="field-label">04 — Text color</div>
+
+    <div class="color-mode-row">
+      <button class="toggle-btn active" id="mode-solid">● Solid color</button>
+      <button class="toggle-btn" id="mode-gradient">◑ Gradient</button>
+    </div>
+
+    <!-- Solid -->
+    <div id="solid-controls">
+      <div class="control-group">
+        <label>Color</label>
+        <input type="color" id="text-color" value="#ffffff">
+      </div>
+    </div>
+
+    <!-- Gradient -->
+    <div class="gradient-controls" id="gradient-controls">
+      <div class="grad-row">
+        <div class="control-group">
+          <label>Start color</label>
+          <input type="color" id="grad-color1" value="#e8ff47">
+        </div>
+        <div class="control-group">
+          <label>End color</label>
+          <input type="color" id="grad-color2" value="#ff6b35">
+        </div>
+        <div class="control-group">
+          <label>Direction</label>
+          <div class="dir-group">
+            <button class="dir-btn active" id="dir-v" title="Vertical (top → bottom)">↕</button>
+            <button class="dir-btn" id="dir-h" title="Horizontal (left → right)">↔</button>
+          </div>
+        </div>
+      </div>
+      <div class="grad-bar" id="grad-bar"></div>
+    </div>
+  </div>
+
+  <!-- 05 OUTLINE -->
+  <div>
+    <div class="stroke-header">
+      <div class="stroke-toggle-wrap">
+        <span>05 — Outline</span>
+        <label class="switch">
+          <input type="checkbox" id="stroke-enabled">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="stroke-body" id="stroke-body">
+      <div class="control-group">
+        <label>Outline color</label>
+        <input type="color" id="stroke-color" value="#000000">
+      </div>
+      <div class="control-group">
+        <label>Width — <span class="range-val" id="stroke-val">4</span>px</label>
+        <input type="range" id="stroke-width" min="1" max="40" value="4" step="1">
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 PREVIEW -->
+  <div>
+    <div class="field-label">06 — Preview</div>
+    <div class="preview-wrap">
+      <div class="preview-placeholder" id="preview-placeholder">
+        <span>🖼️</span>
+        <span>Load a font and type something</span>
+      </div>
+      <canvas id="preview-canvas" style="display:none;"></canvas>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions">
+    <button class="btn btn-ghost" id="btn-refresh" disabled>↺ Refresh</button>
+    <button class="btn btn-png"   id="btn-png"     disabled>↓ PNG</button>
+    <button class="btn btn-svg"   id="btn-svg"     disabled>↓ SVG</button>
+  </div>
+
+  <div class="status" id="status-msg"></div>
+
+</div>
+
+<script>
+  let fontLoaded = false;
+  let customFontFamily = null;
+  let fontFileName = 'output';
+  let fontBase64 = null;
+  let fontMime = 'font/ttf';
+  let colorMode = 'solid';
+  let gradDir = 'v';
+
+  const fontFileInput      = document.getElementById('font-file');
+  const dropZone           = document.getElementById('drop-zone');
+  const fontStatusEl       = document.getElementById('font-status');
+  const fontNameEl         = document.getElementById('font-name');
+  const textInput          = document.getElementById('text-input');
+  const fontSizeEl         = document.getElementById('font-size');
+  const paddingEl          = document.getElementById('padding');
+  const textColorEl        = document.getElementById('text-color');
+  const textAlignEl        = document.getElementById('text-align');
+  const lineHeightEl       = document.getElementById('line-height');
+  const scaleEl            = document.getElementById('scale');
+  const previewCanvas      = document.getElementById('preview-canvas');
+  const previewPlaceholder = document.getElementById('preview-placeholder');
+  const btnRefresh         = document.getElementById('btn-refresh');
+  const btnPng             = document.getElementById('btn-png');
+  const btnSvg             = document.getElementById('btn-svg');
+  const statusMsg          = document.getElementById('status-msg');
+  const sizeVal            = document.getElementById('size-val');
+  const padVal             = document.getElementById('pad-val');
+  const lhVal              = document.getElementById('lh-val');
+  const modeSolid          = document.getElementById('mode-solid');
+  const modeGrad           = document.getElementById('mode-gradient');
+  const solidControls      = document.getElementById('solid-controls');
+  const gradControls       = document.getElementById('gradient-controls');
+  const gradColor1         = document.getElementById('grad-color1');
+  const gradColor2         = document.getElementById('grad-color2');
+  const gradBar            = document.getElementById('grad-bar');
+  const dirV               = document.getElementById('dir-v');
+  const dirH               = document.getElementById('dir-h');
+
+  const strokeEnabledEl = document.getElementById('stroke-enabled');
+  const strokeColorEl   = document.getElementById('stroke-color');
+  const strokeWidthEl   = document.getElementById('stroke-width');
+  const strokeValEl     = document.getElementById('stroke-val');
+  const strokeBody      = document.getElementById('stroke-body');
+
+  strokeEnabledEl.addEventListener('change', () => {
+    strokeBody.classList.toggle('visible', strokeEnabledEl.checked);
+    scheduleRender();
+  });
+  strokeColorEl.addEventListener('input', scheduleRender);
+  strokeWidthEl.addEventListener('input', () => { strokeValEl.textContent = strokeWidthEl.value; scheduleRender(); });
+
+  // ── Color mode ──
+  modeSolid.addEventListener('click', () => {
+    colorMode = 'solid';
+    modeSolid.classList.add('active'); modeGrad.classList.remove('active');
+    solidControls.style.display = ''; gradControls.classList.remove('visible');
+    scheduleRender();
+  });
+
+  modeGrad.addEventListener('click', () => {
+    colorMode = 'gradient';
+    modeGrad.classList.add('active'); modeSolid.classList.remove('active');
+    solidControls.style.display = 'none'; gradControls.classList.add('visible');
+    updateGradBar(); scheduleRender();
+  });
+
+  // ── Gradient direction ──
+  dirV.addEventListener('click', () => { gradDir = 'v'; dirV.classList.add('active'); dirH.classList.remove('active'); updateGradBar(); scheduleRender(); });
+  dirH.addEventListener('click', () => { gradDir = 'h'; dirH.classList.add('active'); dirV.classList.remove('active'); updateGradBar(); scheduleRender(); });
+
+  function updateGradBar() {
+    const dir = gradDir === 'v' ? 'to bottom' : 'to right';
+    gradBar.style.background = `linear-gradient(${dir}, ${gradColor1.value}, ${gradColor2.value})`;
+  }
+
+  gradColor1.addEventListener('input', () => { updateGradBar(); scheduleRender(); });
+  gradColor2.addEventListener('input', () => { updateGradBar(); scheduleRender(); });
+  updateGradBar();
+
+  // ── Drag & drop ──
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if (f) loadFont(f); });
+  fontFileInput.addEventListener('change', () => { if (fontFileInput.files[0]) loadFont(fontFileInput.files[0]); });
+
+  function loadFont(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const mimeMap = { ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2' };
+    if (!mimeMap[ext]) { setStatus('Unsupported format. Use TTF, OTF, WOFF or WOFF2.', 'err'); return; }
+    fontMime = mimeMap[ext];
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const uid = 'custom-font-' + Date.now();
+      try {
+        const buf = e.target.result;
+        const face = new FontFace(uid, buf);
+        await face.load();
+        document.fonts.add(face);
+        customFontFamily = uid;
+        fontFileName = file.name.replace(/\.[^.]+$/, '');
+
+        // base64 for SVG embedding
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        fontBase64 = btoa(binary);
+
+        fontLoaded = true;
+        fontNameEl.textContent = file.name;
+        fontStatusEl.classList.add('visible');
+        setStatus('Font loaded successfully ✓', 'ok');
+        enableButtons();
+        renderPreview();
+      } catch (err) {
+        setStatus('Failed to load font. Is it corrupted?', 'err');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function enableButtons() {
+    const ready = fontLoaded && textInput.value.trim().length > 0;
+    btnRefresh.disabled = !ready;
+    btnPng.disabled = !ready;
+    btnSvg.disabled = !ready;
+  }
+
+  // ── Range inputs ──
+  fontSizeEl.addEventListener('input',   () => { sizeVal.textContent = fontSizeEl.value; scheduleRender(); });
+  paddingEl.addEventListener('input',    () => { padVal.textContent  = paddingEl.value;  scheduleRender(); });
+  lineHeightEl.addEventListener('input', () => { lhVal.textContent   = parseFloat(lineHeightEl.value).toFixed(2); scheduleRender(); });
+  textColorEl.addEventListener('input',  scheduleRender);
+  textAlignEl.addEventListener('change', scheduleRender);
+  scaleEl.addEventListener('change',     scheduleRender);
+  textInput.addEventListener('input',    () => { enableButtons(); scheduleRender(); });
+
+  btnRefresh.addEventListener('click', renderPreview);
+  btnPng.addEventListener('click', downloadPNG);
+  btnSvg.addEventListener('click', downloadSVG);
+
+  let renderTimer = null;
+  function scheduleRender() { clearTimeout(renderTimer); renderTimer = setTimeout(renderPreview, 180); }
+
+  function getParams() {
+    return {
+      text:       textInput.value,
+      fontSize:   parseInt(fontSizeEl.value),
+      padding:    parseInt(paddingEl.value),
+      color:      textColorEl.value,
+      align:      textAlignEl.value,
+      lineHeight: parseFloat(lineHeightEl.value),
+      scale:      parseInt(scaleEl.value),
+      colorMode,
+      gradColor1: gradColor1.value,
+      gradColor2: gradColor2.value,
+      gradDir,
+      strokeEnabled: strokeEnabledEl.checked,
+      strokeColor:   strokeColorEl.value,
+      strokeWidth:   parseInt(strokeWidthEl.value),
+    };
+  }
+
+  function buildCanvasFill(ctx, p, W, H) {
+    if (p.colorMode === 'solid') return p.color;
+    const g = p.gradDir === 'v'
+      ? ctx.createLinearGradient(0, 0, 0, H)
+      : ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, p.gradColor1);
+    g.addColorStop(1, p.gradColor2);
+    return g;
+  }
+
+  function renderToCanvas(canvas, p, scale) {
+    const ctx   = canvas.getContext('2d');
+    const lines = p.text.split('\n');
+    const fs    = p.fontSize * scale;
+    const pad   = p.padding * scale;
+    const lh    = fs * p.lineHeight;
+
+    ctx.font = `${fs}px "${customFontFamily}"`;
+    let maxW = 0;
+    for (const line of lines) { const w = ctx.measureText(line).width; if (w > maxW) maxW = w; }
+
+    const W = Math.ceil(maxW + pad * 2);
+    const H = Math.ceil(lh * lines.length + pad * 2);
+
+    canvas.width = W; canvas.height = H;
+    ctx.clearRect(0, 0, W, H);
+    ctx.font         = `${fs}px "${customFontFamily}"`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign    = p.align;
+
+    const xBase = p.align === 'center' ? W / 2 : p.align === 'right' ? W - pad : pad;
+
+    // Stroke pass (drawn first so fill sits on top)
+    if (p.strokeEnabled && p.strokeWidth > 0) {
+      ctx.strokeStyle = p.strokeColor;
+      ctx.lineWidth   = p.strokeWidth * scale * 2; // *2 because half is clipped by fill
+      ctx.lineJoin    = 'round';
+      ctx.miterLimit  = 2;
+      lines.forEach((line, i) => ctx.strokeText(line, xBase, pad + i * lh));
+    }
+
+    // Fill pass
+    ctx.fillStyle = buildCanvasFill(ctx, p, W, H);
+    lines.forEach((line, i) => ctx.fillText(line, xBase, pad + i * lh));
+  }
+
+  function renderPreview() {
+    if (!fontLoaded || !textInput.value.trim()) return;
+    renderToCanvas(previewCanvas, getParams(), 1);
+    previewPlaceholder.style.display = 'none';
+    previewCanvas.style.display = 'block';
+    setStatus(`Preview: ${previewCanvas.width}×${previewCanvas.height}px`, '');
+  }
+
+  // ── PNG ──
+  function downloadPNG() {
+    if (!fontLoaded || !textInput.value.trim()) return;
+    const p = getParams();
+    const off = document.createElement('canvas');
+    renderToCanvas(off, p, p.scale);
+    off.toBlob(blob => {
+      trigger(URL.createObjectURL(blob), `${fontFileName}_${Date.now()}.png`);
+      setStatus(`PNG → ${off.width}×${off.height}px @ ${p.scale}x`, 'ok');
+    }, 'image/png');
+  }
+
+  // ── SVG ──
+  function downloadSVG() {
+    if (!fontLoaded || !textInput.value.trim()) return;
+    const p = getParams();
+
+    // Measure using canvas
+    const measure = document.createElement('canvas');
+    renderToCanvas(measure, p, 1);
+    const W = measure.width, H = measure.height;
+
+    const lines = p.text.split('\n');
+    const fs    = p.fontSize;
+    const pad   = p.padding;
+    const lh    = fs * p.lineHeight;
+
+    // Gradient def
+    let gradDef = '', fillRef = p.color;
+    if (p.colorMode === 'gradient') {
+      const x2 = p.gradDir === 'h' ? '100%' : '0%';
+      const y2 = p.gradDir === 'v' ? '100%' : '0%';
+      gradDef = `<linearGradient id="tg" x1="0%" y1="0%" x2="${x2}" y2="${y2}">
+      <stop offset="0%" stop-color="${p.gradColor1}"/>
+      <stop offset="100%" stop-color="${p.gradColor2}"/>
+    </linearGradient>`;
+      fillRef = 'url(#tg)';
+    }
+
+    const fontFace = `@font-face{font-family:"CF";src:url("data:${fontMime};base64,${fontBase64}")}`;
+    const anchorMap = { center: 'middle', left: 'start', right: 'end' };
+    const anchor = anchorMap[p.align];
+    const xBase  = p.align === 'center' ? W / 2 : p.align === 'right' ? W - pad : pad;
+
+    // Use canvas to get accurate per-line metrics — SVG text-anchor handles alignment
+    const textEls = lines.map((line, i) => {
+      const y = pad + i * lh + fs * 0.82;
+      const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const strokeAttrs = p.strokeEnabled && p.strokeWidth > 0
+        ? ` stroke="${p.strokeColor}" stroke-width="${p.strokeWidth * 2}" stroke-linejoin="round" paint-order="stroke"`
+        : '';
+      return `  <text x="${xBase.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" font-family="CF" font-size="${fs}" fill="${fillRef}"${strokeAttrs}>${esc}</text>`;
+    }).join('\n');
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs>
+    ${gradDef}
+    <style>${fontFace}</style>
+  </defs>
+${textEls}
+</svg>`;
+
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    trigger(URL.createObjectURL(blob), `${fontFileName}_${Date.now()}.svg`);
+    setStatus(`SVG → ${W}×${H}px · font embedded`, 'ok');
+  }
+
+  function trigger(url, name) {
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function setStatus(msg, type) {
+    statusMsg.textContent = msg;
+    statusMsg.className = 'status' + (type ? ' ' + type : '');
+  }
+</script>
+</body>
+</html>
